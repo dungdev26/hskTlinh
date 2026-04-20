@@ -29,6 +29,7 @@
             <span class="text-2xl">🏮</span>
             <span class="font-black text-pink-500 tracking-tighter text-lg">HSK MASTER HỌC CÙNG TLINH</span>
         </div>
+        </div>
         <nav class="hidden md:flex gap-6">
             <button onclick="switchTab('study')" id="pc-study" class="text-sm font-bold text-slate-500 py-5">HỌC TẬP</button>
             <button onclick="switchTab('write')" id="pc-write" class="text-sm font-bold text-slate-500 py-5">VIẾT TAY</button>
@@ -68,7 +69,7 @@
                     <div class="grid grid-cols-3 gap-2 mt-6">
                         <button onclick="writer.animateCharacter()" class="bg-indigo-500 text-white p-3 rounded-xl font-bold text-xs">MẪU</button>
                         <button onclick="writer.quiz()" class="bg-orange-500 text-white p-3 rounded-xl font-bold text-xs">THỬ SỨC</button>
-                        <button onclick="initWriter(currentWord, currentPinyin, currentMean)" class="bg-slate-100 text-slate-600 p-3 rounded-xl font-bold text-xs text-xs uppercase font-black">XÓA</button>
+                        <button onclick="initWriter(currentWord, currentPinyin, currentMean)" class="bg-slate-100 text-slate-600 p-3 rounded-xl font-bold text-xs uppercase font-black">XÓA</button>
                     </div>
                 </div>
                 <div class="w-full md:w-48 bg-slate-50 p-4 rounded-2xl">
@@ -115,15 +116,56 @@
 
         let isFlashcardMode = false, writer, currentWord = "爱", currentPinyin = "ài", currentMean = "yêu", typeIdx = 0, score = 0;
 
-        // --- HÀM ĐỌC (TEXT TO SPEECH) ---
+        // --- BẮT ĐẦU PHẦN ÂM THANH MỚI ---
+        let isAudioUnlocked = false;
+        let zhVoice = null;
+
+        function loadVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            zhVoice = voices.find(voice => voice.lang.includes('zh') || voice.lang.includes('cmn'));
+        }
+
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        function unlockAudio() {
+            if (isAudioUnlocked) return;
+            const silentMsg = new SpeechSynthesisUtterance('');
+            silentMsg.volume = 0;
+            window.speechSynthesis.speak(silentMsg);
+            isAudioUnlocked = true;
+            
+            document.removeEventListener('touchstart', unlockAudio);
+            document.removeEventListener('click', unlockAudio);
+        }
+
+        document.addEventListener('touchstart', unlockAudio, { once: true });
+        document.addEventListener('click', unlockAudio, { once: true });
+
         function speak(text) {
+            if (!window.speechSynthesis) {
+                console.warn("Trình duyệt không hỗ trợ Web Speech API");
+                return;
+            }
+            
             window.speechSynthesis.cancel();
-            const msg = new SpeechSynthesisUtterance();
-            msg.text = text;
+
+            const msg = new SpeechSynthesisUtterance(text);
             msg.lang = 'zh-CN';
             msg.rate = 0.8;
+            
+            if (zhVoice) {
+                msg.voice = zhVoice;
+            }
+
+            msg.onerror = function(e) {
+                console.error("Lỗi phát âm thanh:", e);
+            };
+
             window.speechSynthesis.speak(msg);
         }
+        // --- KẾT THÚC PHẦN ÂM THANH MỚI ---
 
         function switchTab(tab) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -175,7 +217,7 @@
             if (val === word.pinyin.replace(/\s/g, '').toLowerCase() || val === word.char) {
                 document.getElementById('feedback').innerText = "CHÍNH XÁC! ✨";
                 score++; document.getElementById('type-score').innerText = `ĐÚNG: ${score}`;
-                speak(word.char); // Tự động đọc khi gõ đúng
+                speak(word.char);
                 setTimeout(() => { typeIdx = (typeIdx + 1) % vocabulary.length; nextTypeWord(); }, 800);
             }
         });
